@@ -493,15 +493,37 @@
                 
                 <div class="form-group">
                     <label>[FROM] OTKUDA:</label>
-                    <select id="from" disabled>
-                        <option>Toshkent</option>
+                    <select id="from">
+                        <option value="Toshkent" selected>Toshkent</option>
+                        <option value="Samarqand">Samarqand</option>
+                        <option value="Buxoro">Buxoro</option>
+                        <option value="Andijon">Andijon</option>
+                        <option value="Farg'ona">Farg'ona</option>
+                        <option value="Namangan">Namangan</option>
+                        <option value="Navoiy">Navoiy</option>
+                        <option value="Qarshi">Qarshi</option>
+                        <option value="Termiz">Termiz</option>
+                        <option value="Guliston">Guliston</option>
+                        <option value="Jizzax">Jizzax</option>
+                        <option value="Nukus">Nukus</option>
                     </select>
                 </div>
 
                 <div class="form-group">
                     <label>[TO] KUDA:</label>
-                    <select id="to" disabled>
-                        <option>Navoiy</option>
+                    <select id="to">
+                        <option value="Toshkent">Toshkent</option>
+                        <option value="Samarqand">Samarqand</option>
+                        <option value="Buxoro">Buxoro</option>
+                        <option value="Andijon">Andijon</option>
+                        <option value="Farg'ona">Farg'ona</option>
+                        <option value="Namangan">Namangan</option>
+                        <option value="Navoiy" selected>Navoiy</option>
+                        <option value="Qarshi">Qarshi</option>
+                        <option value="Termiz">Termiz</option>
+                        <option value="Guliston">Guliston</option>
+                        <option value="Jizzax">Jizzax</option>
+                        <option value="Nukus">Nukus</option>
                     </select>
                 </div>
 
@@ -533,7 +555,7 @@
 
         <footer>
             <div class="counter" style="margin-bottom: 15px;">ONLINE USERS: 147</div>
-            <p>© 2000-2006 AVTOBUS.UZ - All Rights Reserved</p>
+            <p>© 2000-2026 AVTOBUS.UZ - All Rights Reserved</p>
             <p style="margin-top: 10px; color: #ff00ff;">Best viewed in 800x600</p>
         </footer>
     </div>
@@ -552,6 +574,21 @@
             { id: 3, time: '15:00', duration: '4ch 45min', price: 42000, seats: 40, company: 'Silk Road Bus' },
             { id: 4, time: '19:00', duration: '4ch 20min', price: 48000, seats: 40, company: 'Central Asia Lines' }
         ];
+
+        // --- NEW LOCAL STORAGE LOGIC ---
+        function getTakenSeats(busId, date) {
+            const key = `booked_seats_${busId}_${date}`;
+            const stored = localStorage.getItem(key);
+            return stored ? JSON.parse(stored) : [];
+        }
+
+        function saveBookedSeats(busId, date, newSeats) {
+            const key = `booked_seats_${busId}_${date}`;
+            const current = getTakenSeats(busId, date);
+            const updated = [...new Set([...current, ...newSeats])];
+            localStorage.setItem(key, JSON.stringify(updated));
+        }
+        // --- END LOCAL STORAGE LOGIC ---
 
         document.querySelectorAll('.nav-item').forEach(item => {
             item.addEventListener('click', function(e) {
@@ -573,9 +610,17 @@
         }
 
         function searchBuses() {
+            const from = document.getElementById('from').value;
+            const to = document.getElementById('to').value;
             const date = document.getElementById('date').value;
+            
             if (!date) {
                 alert('Pozhaluista, vyberite datu!');
+                return;
+            }
+
+            if (from === to) {
+                alert('Gorod otpravleniya i naznacheniya ne mogut sovpadat!');
                 return;
             }
 
@@ -583,8 +628,8 @@
             results.innerHTML = '<h2 style="font-size: 20px; margin: 30px 0; color: #00ffff;">[RESULTS] DOSTUPNYE REISY:</h2>';
 
             buses.forEach(bus => {
-                const takenSeats = Math.floor(Math.random() * 15);
-                const available = bus.seats - takenSeats;
+                const booked = getTakenSeats(bus.id, date);
+                const available = bus.seats - booked.length;
                 
                 results.innerHTML += `
                     <div class="bus-card">
@@ -595,8 +640,8 @@
                         <div class="bus-info">>>> Kompaniya: ${bus.company}</div>
                         <div class="bus-info">>>> Vremya v puti: ${bus.duration}</div>
                         <div class="bus-info">>>> Svobodnykh mest: ${available}/${bus.seats}</div>
-                        <div class="bus-info">>>> Marshrut: Toshkent -> Navoiy</div>
-                        <button class="btn-y2k" onclick="selectBus(${bus.id}, '${date}')">
+                        <div class="bus-info">>>> Marshrut: ${from} -> ${to}</div>
+                        <button class="btn-y2k" onclick="selectBus(${bus.id}, '${date}', '${from}', '${to}')">
                             [BOOK] ZABRONIROVAT
                         </button>
                     </div>
@@ -604,9 +649,9 @@
             });
         }
 
-        function selectBus(busId, date) {
+        function selectBus(busId, date, from, to) {
             const bus = buses.find(b => b.id === busId);
-            storage.selectedBus = { ...bus, date };
+            storage.selectedBus = { ...bus, date, from, to };
             storage.selectedSeats = [];
             
             showPage('booking');
@@ -622,7 +667,7 @@
                     <h3>[INFO] INFORMATSIYA O REISE</h3>
                     <div class="summary-item">
                         <span>Marshrut:</span>
-                        <strong>Toshkent -> Navoiy</strong>
+                        <strong>${bus.from} -> ${bus.to}</strong>
                     </div>
                     <div class="summary-item">
                         <span>Data:</span>
@@ -658,10 +703,7 @@
             `;
 
             const grid = document.getElementById('seatGrid');
-            const takenSeats = [];
-            for (let i = 0; i < 10; i++) {
-                takenSeats.push(Math.floor(Math.random() * 40) + 1);
-            }
+            const takenSeats = getTakenSeats(bus.id, bus.date);
 
             for (let i = 1; i <= 40; i++) {
                 const seat = document.createElement('div');
@@ -749,7 +791,7 @@
                     <h3>[BOOKING] VASHE BRONIROVANIE</h3>
                     <div class="summary-item">
                         <span>Reis:</span>
-                        <strong>Toshkent -> Navoiy (${storage.selectedBus.time})</strong>
+                        <strong>${storage.selectedBus.from} -> ${storage.selectedBus.to} (${storage.selectedBus.time})</strong>
                     </div>
                     <div class="summary-item">
                         <span>Data:</span>
@@ -834,6 +876,9 @@
         }
 
         function completeBooking() {
+            // Save to Local Storage
+            saveBookedSeats(storage.selectedBus.id, storage.selectedBus.date, storage.selectedSeats);
+
             const ticketId = Date.now();
             const ticket = {
                 id: ticketId,
@@ -901,7 +946,7 @@
                             </tr>
                             <tr>
                                 <td>Marshrut</td>
-                                <td>Toshkent -> Navoiy</td>
+                                <td>${ticket.bus.from} -> ${ticket.bus.to}</td>
                             </tr>
                             <tr>
                                 <td>Data poezdki</td>
